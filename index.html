@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>莫爾圓分析工具</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#ffffff; --border:#d5d9e0; --ink:#1f2733;
+    --muted:#6b7480; --accent:#2563eb; --accent-d:#1d4ed8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Microsoft JhengHei","標楷體","Segoe UI",system-ui,sans-serif;
+    font-size:14px; line-height:1.5;
+  }
+  header{
+    background:linear-gradient(90deg,#1e293b,#334155); color:#fff;
+    padding:14px 22px;
+  }
+  header h1{margin:0; font-size:19px; font-weight:600;}
+  header p{margin:4px 0 0; font-size:12.5px; color:#cbd5e1;}
+  .wrap{display:flex; gap:16px; padding:16px; align-items:flex-start; flex-wrap:wrap;}
+  .controls{flex:0 0 430px; max-width:100%;}
+  .plotarea{flex:1 1 560px; min-width:340px;}
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px; margin-bottom:14px;
+  }
+  .card h2{margin:0 0 10px; font-size:14px; color:var(--accent-d);
+    border-bottom:1px solid var(--border); padding-bottom:6px; letter-spacing:.3px;}
+  label{font-size:13px; color:var(--ink);}
+  .row{display:flex; align-items:center; gap:8px; margin:6px 0; flex-wrap:wrap;}
+  .row > label{flex:0 0 auto;}
+  input[type=number],input[type=text],select{
+    padding:4px 6px; border:1px solid var(--border); border-radius:6px;
+    font-size:13px; background:#fff; color:var(--ink);
+  }
+  input[type=number]{width:82px;} input[type=text]{width:110px;}
+  input[type=color]{width:34px; height:26px; padding:0; border:1px solid var(--border);
+    border-radius:6px; background:#fff; cursor:pointer;}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:6px; overflow:hidden;}
+  .seg button{border:0; background:#fff; padding:5px 10px; cursor:pointer; font-size:12.5px; color:var(--muted);}
+  .seg button.on{background:var(--accent); color:#fff;}
+  button.btn{
+    border:0; border-radius:7px; background:var(--accent); color:#fff;
+    padding:7px 14px; font-size:13px; cursor:pointer; font-weight:500;
+  }
+  button.btn:hover{background:var(--accent-d);}
+  button.btn.ghost{background:#eef1f6; color:var(--ink);}
+  button.btn.ghost:hover{background:#e2e7ef;}
+  button.btn.subsup{padding:3px 8px; font-size:12px;}
+  table.circ{width:100%; border-collapse:collapse; font-size:12.5px;}
+  table.circ th{color:var(--muted); font-weight:600; padding:4px 3px; text-align:center; font-size:11.5px;}
+  table.circ td{padding:3px 3px; text-align:center; vertical-align:middle;}
+  table.circ input[type=number]{width:64px;}
+  table.circ input[type=text]{width:74px;}
+  table.circ select{max-width:96px;}
+  .del{border:0; background:#fee2e2; color:#b91c1c; border-radius:5px; width:24px; height:24px; cursor:pointer; font-weight:700;}
+  .hint{font-size:12px; color:var(--muted); margin:6px 0 0;}
+  .phi-box{background:#eef4ff; border:1px solid #c7d9ff; border-radius:7px; padding:8px 10px; font-size:13px; margin-top:8px;}
+  .phi-box b{color:var(--accent-d); font-size:15px;}
+  canvas{background:#fff; border:1px solid var(--border); border-radius:10px; width:100%; height:auto; display:block;}
+  .sub{display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:4px 0;}
+  .chk{display:flex; align-items:center; gap:5px;}
+  details summary{cursor:pointer; font-size:12.5px; color:var(--muted);}
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>莫爾圓分析工具 (Mohr Circle Analysis)</h1>
+  <p>依圍壓與軸差/軸向應力繪製莫爾圓、破壞包絡線（摩擦角）與節理傾角點。所有計算與繪圖皆在本機瀏覽器完成。</p>
+</header>
+
+<div class="wrap">
+  <!-- ============ 左側控制區 ============ -->
+  <div class="controls">
+
+    <div class="card">
+      <h2>圖表設定</h2>
+      <div class="row">
+        <label>標題</label>
+        <input type="text" id="title" value="Mohr Circle Analysis" style="width:220px;">
+      </div>
+      <div class="row">
+        <label>X 軸標題</label>
+        <input type="text" id="xtitle" value="正向應力 σ_n (MPa)" style="width:150px;">
+        <button class="btn ghost subsup" data-target="xtitle" data-kind="sub" title="選取文字後按此設為下標">X₂ 下標</button>
+        <button class="btn ghost subsup" data-target="xtitle" data-kind="sup" title="選取文字後按此設為上標">X² 上標</button>
+      </div>
+      <div class="row">
+        <label>Y 軸標題</label>
+        <input type="text" id="ytitle" value="剪應力 τ (MPa)" style="width:150px;">
+        <button class="btn ghost subsup" data-target="ytitle" data-kind="sub" title="選取文字後按此設為下標">X₂ 下標</button>
+        <button class="btn ghost subsup" data-target="ytitle" data-kind="sup" title="選取文字後按此設為上標">X² 上標</button>
+      </div>
+      <div class="hint" style="margin-top:0;">上下標：在標題框內選取要變的字，再按「下標／上標」。</div>
+      <div class="row">
+        <label>圖片比例 (寬:高)</label>
+        <select id="ratio">
+          <option value="auto">自動（依資料）</option>
+          <option value="4:3">4 : 3</option>
+          <option value="1:1">1 : 1</option>
+          <option value="16:9">16 : 9</option>
+          <option value="16:10">16 : 10（橫式）</option>
+        </select>
+      </div>
+      <div class="hint" id="rangeInfo" style="margin-top:2px;">固定比例時，會自動放大某一軸上限以填滿畫面、莫爾圓維持正圓。</div>
+      <div class="row">
+        <label>第二欄輸入為</label>
+        <span class="seg" id="segMode">
+          <button data-mode="dev" class="on">軸差應力 (σ₁−σ₃)</button>
+          <button data-mode="axial">軸向應力 σ₁</button>
+        </span>
+      </div>
+      <div class="row">
+        <label>σ 軸最大值</label>
+        <input type="number" id="xmax" placeholder="自動" step="1">
+        <label>τ 軸最大值</label>
+        <input type="number" id="ymax" placeholder="自動" step="1">
+        <span class="hint" style="margin:0;">留空＝自動</span>
+      </div>
+      <div class="row">
+        <label>圖表高度上限</label>
+        <input type="number" id="hmax" placeholder="自動" step="10"> px
+        <span class="hint" style="margin:0;">留空＝依比例；設定後圖會等比縮小</span>
+      </div>
+      <div class="row">
+        <span class="chk"><input type="checkbox" id="grid" checked><label for="grid">顯示格線</label></span>
+        <span class="chk"><input type="checkbox" id="legend" checked><label for="legend">顯示圖例</label></span>
+      </div>
+      <div class="row">
+        <label>圖例字級</label>
+        <input type="number" id="legendSize" value="13" min="6" max="40" step="1" style="width:60px;">
+        <label>框內距</label>
+        <input type="number" id="legendPad" value="9" min="0" max="40" step="1" style="width:60px;">
+        <label>樣本長度</label>
+        <input type="number" id="legendSample" value="34" min="6" max="120" step="2" style="width:60px;">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>莫爾圓（各圍壓）</h2>
+      <div class="hint" style="margin-top:0;">每一列一個圍壓。線型共 10 種可選；顏色、線寬可自訂。</div>
+      <table class="circ">
+        <thead>
+          <tr>
+            <th>圍壓 σ₃</th><th id="col2head">軸差 σ₁−σ₃</th><th>圖例標籤</th>
+            <th>線型</th><th>顏色</th><th>線寬</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="circBody"></tbody>
+      </table>
+      <div class="toolbar" style="margin-top:10px;">
+        <button class="btn ghost" id="addRow">＋ 新增圍壓</button>
+        <button class="btn ghost" id="loadDemo7">載入範例：7 圓</button>
+        <button class="btn ghost" id="loadDemo2">載入範例：2 圓</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>節理傾角</h2>
+      <div class="row">
+        <label>節理傾角 β</label>
+        <input type="number" id="beta" value="60" step="1"> 度
+        <span class="hint" style="margin:0;">（節理點位於圓上 2β 位置）</span>
+      </div>
+      <div class="sub">
+        <span class="chk"><input type="checkbox" id="showJoint" checked><label for="showJoint">顯示節理點</label></span>
+        <label>顏色</label><input type="color" id="jointColor" value="#111111">
+      </div>
+      <div class="sub">
+        <span class="chk"><input type="checkbox" id="showCenter"><label for="showCenter">顯示圓心連線 (2β)</label></span>
+        <label>套用於</label>
+        <select id="centerTarget"></select>
+      </div>
+      <div class="sub">
+        <label>線型</label><select id="centerStyle"></select>
+        <label>顏色</label><input type="color" id="centerColor" value="#111111">
+      </div>
+      <div class="sub">
+        <span class="chk"><input type="checkbox" id="showBetaArc"><label for="showBetaArc">標示 2β 角度</label></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>摩擦角 / 破壞包絡線</h2>
+      <div class="hint" style="margin-top:0;">φ 由所有節理點過原點回歸計算：τ = σ·tan(φ)。</div>
+      <div class="row">
+        <label>小數點位數</label>
+        <input type="number" id="phiDec" value="1" min="0" max="6" step="1" style="width:60px;">
+        <span class="hint" style="margin:0;">（φ 值、圖上公式、角度標示同步）</span>
+      </div>
+      <div class="sub">
+        <span class="chk"><input type="checkbox" id="showEnv" checked><label for="showEnv">顯示破壞包絡線</label></span>
+        <label>顏色</label><input type="color" id="envColor" value="#b5451b">
+        <label>線型</label>
+        <select id="envStyle"></select>
+      </div>
+      <div class="sub">
+        <span class="chk"><input type="checkbox" id="showPhiArc"><label for="showPhiArc">標示 φ 角度</label></span>
+      </div>
+      <div class="phi-box" id="phiBox">摩擦角 φ = —</div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" id="exportBtn">⤓ 匯出 PNG 圖檔</button>
+    </div>
+  </div>
+
+  <!-- ============ 右側繪圖區 ============ -->
+  <div class="plotarea">
+    <div class="card" style="padding:10px;">
+      <canvas id="cv"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ============ 線型定義（10 種）============
+const LINE_STYLES = [
+  {name:"實線",       dash:[]},
+  {name:"虛線",       dash:[10,6]},
+  {name:"點線",       dash:[2,4]},
+  {name:"點劃線(中心線)", dash:[14,5,2,5]},
+  {name:"雙點劃線",   dash:[14,4,2,4,2,4]},
+  {name:"長虛線",     dash:[20,8]},
+  {name:"短虛線",     dash:[6,4]},
+  {name:"疏點線",     dash:[2,9]},
+  {name:"密虛線",     dash:[9,3]},
+  {name:"長短交替線", dash:[18,5,6,5]},
+];
+const DEFAULT_COLORS = ["#3b82f6","#e8862f","#2ca02c","#d62728","#7b52c9",
+                        "#8c564b","#17a2b8","#e377c2","#7f7f2f","#1f3a8a"];
+// 字體：英文與符號用 Times New Roman，中文自動 fallback 標楷體 DFKai-SB
+const FF = "'Times New Roman','DFKai-SB','標楷體',serif";
+const font = (spec) => spec + " " + FF;   // spec 例如 "600 20px"
+
+// ============ 狀態 ============
+let circles = [];  // {s3, val, label, style, color, width}
+let inputMode = "dev"; // dev = 軸差, axial = 軸向σ1
+let nextColorIdx = 0;
+
+const $ = id => document.getElementById(id);
+
+// ---- 填入線型下拉選單 ----
+function styleOptions(sel){
+  sel.innerHTML = LINE_STYLES.map((s,i)=>`<option value="${i}">${s.name}</option>`).join("");
+}
+
+// ---- 新增一列圍壓 ----
+function addCircle(s3="", val="", styleIdx=0){
+  const color = DEFAULT_COLORS[nextColorIdx % DEFAULT_COLORS.length];
+  nextColorIdx++;
+  circles.push({s3, val, label:"", style:styleIdx, color, width:2});
+  renderRows();
+  redraw();
+}
+
+function renderRows(){
+  const body = $("circBody");
+  body.innerHTML = "";
+  circles.forEach((c,i)=>{
+    const tr = document.createElement("tr");
+    const styleSel = LINE_STYLES.map((s,k)=>`<option value="${k}" ${k==c.style?"selected":""}>${s.name}</option>`).join("");
+    tr.innerHTML = `
+      <td><input type="number" step="0.01" value="${c.s3}" data-i="${i}" data-f="s3"></td>
+      <td><input type="number" step="0.01" value="${c.val}" data-i="${i}" data-f="val"></td>
+      <td><input type="text" value="${c.label}" placeholder="${autoLabel(c)}" data-i="${i}" data-f="label"></td>
+      <td><select data-i="${i}" data-f="style">${styleSel}</select></td>
+      <td><input type="color" value="${c.color}" data-i="${i}" data-f="color"></td>
+      <td><input type="number" step="0.5" min="0.5" value="${c.width}" style="width:52px" data-i="${i}" data-f="width"></td>
+      <td><button class="del" data-del="${i}">×</button></td>`;
+    body.appendChild(tr);
+  });
+  // 綁定事件
+  body.querySelectorAll("input,select").forEach(el=>{
+    const ev = el.type==="color" ? "input" : "change";
+    el.addEventListener(ev, e=>{
+      const i=+e.target.dataset.i, f=e.target.dataset.f;
+      let v=e.target.value;
+      if(f==="s3"||f==="val"||f==="width") v = v===""?"":parseFloat(v);
+      if(f==="style") v = parseInt(v);
+      circles[i][f]=v;
+      if(f==="s3"||f==="val") { renderCenterTarget(); }
+      redraw();
+    });
+  });
+  body.querySelectorAll("[data-del]").forEach(b=>{
+    b.addEventListener("click", e=>{
+      circles.splice(+e.target.dataset.del,1);
+      renderRows(); renderCenterTarget(); redraw();
+    });
+  });
+  renderCenterTarget();
+}
+
+function autoLabel(c){
+  if(c.s3==="" || isNaN(c.s3)) return "圍壓";
+  return c.s3 + " MPa";
+}
+
+// ---- 圓心連線目標下拉 ----
+function renderCenterTarget(){
+  const sel = $("centerTarget");
+  const cur = sel.value;
+  let opts = `<option value="all">全部</option>`;
+  circles.forEach((c,i)=>{ opts += `<option value="${i}">${autoLabel(c)}</option>`; });
+  sel.innerHTML = opts;
+  if(cur && (cur==="all" || +cur<circles.length)) sel.value = cur;
+  else sel.value = circles.length ? String(circles.length-1) : "all";
+}
+
+// ============ 計算 ============
+function circleGeom(c){
+  const s3 = parseFloat(c.s3);
+  const v  = parseFloat(c.val);
+  if(isNaN(s3) || isNaN(v)) return null;
+  const s1 = inputMode==="dev" ? s3 + v : v;
+  if(s1 <= s3) return null;
+  return {s3, s1, center:(s1+s3)/2, radius:(s1-s3)/2};
+}
+
+function jointPoint(g, betaDeg){
+  const t = betaDeg*2*Math.PI/180;
+  return {x: g.center + g.radius*Math.cos(t), y: g.radius*Math.sin(t)};
+}
+
+// 過原點回歸 → 摩擦角
+function frictionAngle(betaDeg){
+  let sxy=0, sxx=0, n=0;
+  circles.forEach(c=>{
+    const g=circleGeom(c); if(!g) return;
+    const p=jointPoint(g,betaDeg);
+    sxy += p.x*p.y; sxx += p.x*p.x; n++;
+  });
+  if(n===0 || sxx===0) return null;
+  const m = sxy/sxx;
+  return {slope:m, phi:Math.atan(m)*180/Math.PI, n};
+}
+
+// ============ 繪圖 ============
+const cv = $("cv");
+const ctx = cv.getContext("2d");
+
+function niceMax(v){
+  if(v<=0) return 10;
+  const exp=Math.floor(Math.log10(v));
+  const base=Math.pow(10,exp);
+  const f=v/base;
+  let nf;
+  if(f<=1)nf=1; else if(f<=2)nf=2; else if(f<=2.5)nf=2.5;
+  else if(f<=5)nf=5; else nf=10;
+  return nf*base;
+}
+
+// 解析上下標標記：_x / _{xx} 為下標，^x / ^{xx} 為上標
+function parseRich(str){
+  const segs=[]; let i=0;
+  while(i<str.length){
+    const ch=str[i];
+    if((ch==="_"||ch==="^") && i+1<str.length){
+      const type = ch==="_" ? "sub" : "sup";
+      if(str[i+1]==="{"){
+        const end=str.indexOf("}", i+2);
+        if(end>-1){ segs.push({t:str.slice(i+2,end), type}); i=end+1; continue; }
+      }
+      segs.push({t:str[i+1], type}); i+=2; continue;
+    }
+    let j=i, buf="";
+    while(j<str.length && str[j]!=="_" && str[j]!=="^"){ buf+=str[j]; j++; }
+    if(buf){ segs.push({t:buf, type:"norm"}); i=j; } else { i++; }
+  }
+  return segs;
+}
+// 繪製含上下標的文字；(cx,cy) 為基準點，align: left/center/right
+function drawRich(str, cx, cy, sizePx, align, weight){
+  const segs=parseRich(str);
+  const mainF=font((weight?weight+" ":"")+sizePx+"px");
+  const subF =font(Math.round(sizePx*0.72)+"px");
+  ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+  let total=0;
+  segs.forEach(sg=>{ ctx.font=(sg.type==="norm")?mainF:subF; total+=ctx.measureText(sg.t).width; });
+  let x = align==="center" ? cx-total/2 : (align==="right" ? cx-total : cx);
+  segs.forEach(sg=>{
+    ctx.font=(sg.type==="norm")?mainF:subF;
+    let dy=0;
+    if(sg.type==="sub") dy=sizePx*0.20;
+    if(sg.type==="sup") dy=-sizePx*0.36;
+    ctx.fillText(sg.t, x, cy+dy);
+    x+=ctx.measureText(sg.t).width;
+  });
+}
+
+function redraw(){
+  const W=980;                       // 邏輯寬（高度依比例動態計算）
+  const betaDeg = parseFloat($("beta").value)||0;
+  const fr = frictionAngle(betaDeg);
+  const phiDec = Math.max(0, Math.min(6, parseInt($("phiDec").value)||0));
+
+  // phi 顯示
+  $("phiBox").innerHTML = fr
+    ? `摩擦角 φ = <b>${fr.phi.toFixed(phiDec)}°</b> &nbsp;｜&nbsp; 斜率 tan φ = ${fr.slope.toFixed(4)} &nbsp;（由 ${fr.n} 個節理點回歸）`
+    : `摩擦角 φ = — （需至少一個有效圍壓）`;
+
+  // 決定座標範圍
+  const geoms = circles.map(circleGeom);
+  let maxS1=0, maxR=0;
+  geoms.forEach(g=>{ if(g){ maxS1=Math.max(maxS1,g.s1); maxR=Math.max(maxR,g.radius);} });
+  let xmax = parseFloat($("xmax").value);
+  let ymax = parseFloat($("ymax").value);
+  if(isNaN(xmax)||xmax<=0) xmax = niceMax(Math.max(maxS1*1.08, 10));
+  if(isNaN(ymax)||ymax<=0) ymax = niceMax(Math.max(maxR*1.12, 5));
+
+  // 繪圖區：等比例縮放（每單位 x、y 像素相同 → 莫爾圓恆為正圓）
+  const mL=70, mT=48, mB=58, mR=30;
+  const legendOn = $("legend").checked;
+  const availW = W - mL - mR;        // 可用繪圖寬
+  const ratioSel = $("ratio").value; // auto / 4:3 / 1:1 / 16:9
+
+  let s, pw, ph, H, px0, py0;
+  if(ratioSel==="auto"){
+    s = availW / xmax;               // 以寬度定比例尺，寬度填滿
+    const hmax = parseFloat($("hmax").value);
+    if(!isNaN(hmax) && hmax>0){       // 高度上限：超高則等比縮小
+      const availH = hmax - mT - mB;
+      if(availH>0 && ymax*s > availH) s = availH / ymax;
+    }
+    pw = xmax*s; ph = ymax*s;
+    H  = mT + ph + mB;
+    px0 = mL; py0 = mT + ph;
+  } else {                            // 固定寬:高比例：放大某軸上限以填滿、正圓不變
+    const [rw,rh] = ratioSel.split(":").map(Number);
+    H = W * rh / rw;
+    pw = availW;                       // 繪圖區填滿
+    ph = H - mT - mB;
+    const A = pw/ph;                   // 需要的資料 x:y 比（= 每軸等尺度時）
+    // 以目前 xmax/ymax（手動或自動）為最小需求，只放大不縮小 → 資料不會被裁掉
+    if(xmax/ymax < A) xmax = ymax*A;   // x 太窄 → 放大 σ 上限
+    else              ymax = xmax/A;   // y 太窄 → 放大 τ 上限
+    s = pw/xmax;                       // 此時 pw/xmax === ph/ymax
+    px0 = mL; py0 = mT + ph;
+  }
+
+  const dpr=window.devicePixelRatio||1;
+  cv.width=W*dpr; cv.height=H*dpr;
+  cv.style.width="100%";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
+
+  const X = v => px0 + v*s;
+  const Y = v => py0 - v*s;
+
+  // 顯示目前生效的軸上限（固定比例時會被自動放大）
+  $("rangeInfo").textContent = ratioSel==="auto"
+    ? `目前上限：σ = ${fmt(xmax)}、τ = ${fmt(ymax)}（下限皆 0）`
+    : `比例 ${ratioSel} 生效上限：σ = ${fmt(xmax)}、τ = ${fmt(ymax)}（下限皆 0，已放大填滿、圓維持正圓）`;
+
+  // 標題（支援 _下標 / ^上標）
+  ctx.fillStyle="#000";
+  drawRich($("title").value, px0+pw/2, (py0-ph)-16, 20, "center", "600");
+
+  // 格線 + 刻度
+  const xStep = niceStep(xmax), yStep = niceStep(ymax);
+  ctx.font=font("13px"); ctx.fillStyle="#000";
+  const gridOn=$("grid").checked;
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  for(let v=0; v<=xmax+1e-9; v+=xStep){
+    const x=X(v);
+    if(gridOn){ ctx.strokeStyle="#eceff3"; ctx.lineWidth=1; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(x,py0); ctx.lineTo(x,py0-ph); ctx.stroke(); }
+    ctx.strokeStyle="#000"; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(x,py0); ctx.lineTo(x,py0-6); ctx.stroke();
+    ctx.fillText(fmt(v), x, py0+8);
+  }
+  ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let v=0; v<=ymax+1e-9; v+=yStep){
+    const y=Y(v);
+    if(gridOn){ ctx.strokeStyle="#eceff3"; ctx.lineWidth=1; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(px0,y); ctx.lineTo(px0+pw,y); ctx.stroke(); }
+    ctx.strokeStyle="#000"; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(px0,y); ctx.lineTo(px0+6,y); ctx.stroke();
+    ctx.fillText(fmt(v), px0-8, y);
+  }
+
+  // 四邊純黑外框（統一粗度）
+  ctx.setLineDash([]); ctx.strokeStyle="#000"; ctx.lineWidth=1.6;
+  ctx.strokeRect(px0, py0-ph, pw, ph);
+
+  // 軸標題（支援上下標；位置貼著繪圖區）
+  ctx.fillStyle="#000";
+  drawRich($("xtitle").value, px0+pw/2, py0+44, 15, "center", "");
+  ctx.save();
+  ctx.translate(px0-46, py0-ph/2); ctx.rotate(-Math.PI/2);
+  drawRich($("ytitle").value, 0, 0, 15, "center", "");
+  ctx.restore();
+
+  // 裁切繪圖區（避免超出）
+  ctx.save();
+  ctx.beginPath(); ctx.rect(px0-1, py0-ph-1, pw+2, ph+2); ctx.clip();
+
+  // ---- 破壞包絡線 (先畫，位於底層) ----
+  if($("showEnv").checked && fr){
+    ctx.strokeStyle=$("envColor").value; ctx.lineWidth=2;
+    ctx.setLineDash(LINE_STYLES[parseInt($("envStyle").value)].dash);
+    ctx.beginPath(); ctx.moveTo(X(0),Y(0)); ctx.lineTo(X(xmax),Y(xmax*fr.slope)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ---- 各莫爾圓 ----
+  geoms.forEach((g,i)=>{
+    if(!g) return;
+    const c=circles[i];
+    ctx.strokeStyle=c.color; ctx.lineWidth=parseFloat(c.width)||2;
+    ctx.setLineDash(LINE_STYLES[c.style].dash);
+    ctx.beginPath();
+    for(let a=0;a<=180;a+=1){
+      const rad=a*Math.PI/180;
+      const x=X(g.center+g.radius*Math.cos(rad));
+      const y=Y(g.radius*Math.sin(rad));
+      if(a===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // ---- 圓心連線 (2β) ----
+  if($("showCenter").checked){
+    const tgt=$("centerTarget").value;
+    const idxs = tgt==="all" ? geoms.map((_,i)=>i) : [parseInt(tgt)];
+    const cDash = LINE_STYLES[parseInt($("centerStyle").value)].dash;
+    ctx.strokeStyle=$("centerColor").value; ctx.lineWidth=2;
+    idxs.forEach(i=>{
+      const g=geoms[i]; if(!g) return;
+      const p=jointPoint(g,betaDeg);
+      ctx.setLineDash(cDash);
+      ctx.beginPath(); ctx.moveTo(X(g.center),Y(0)); ctx.lineTo(X(p.x),Y(p.y)); ctx.stroke();
+      // 圓心小圈（實線）
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(X(g.center),Y(0),3.2,0,2*Math.PI);
+      ctx.fillStyle="#fff"; ctx.fill(); ctx.stroke();
+      // 2β 角度弧
+      if($("showBetaArc").checked){
+        drawAngleArc(X,Y,g.center,0, betaDeg*2, ymax/xmax*pw/ph, "#d61f1f",
+                     "2β="+(betaDeg*2)+"°", px0,py0,pw,ph,xmax,ymax);
+      }
+    });
+  }
+
+  // ---- 節理點 (三角形) ----
+  if($("showJoint").checked){
+    ctx.fillStyle=$("jointColor").value;
+    geoms.forEach(g=>{
+      if(!g) return;
+      const p=jointPoint(g,betaDeg);
+      const sx=X(p.x), sy=Y(p.y), s=6;
+      ctx.beginPath();
+      ctx.moveTo(sx,sy-s); ctx.lineTo(sx-s,sy+s*0.85); ctx.lineTo(sx+s,sy+s*0.85);
+      ctx.closePath(); ctx.fill();
+    });
+  }
+
+  // ---- φ 角度弧 ----
+  if($("showPhiArc").checked && fr){
+    drawAngleArc(X,Y,0,0, fr.phi, ymax/xmax*pw/ph, "#d61f1f",
+                 "Ø="+fr.phi.toFixed(phiDec)+"°", px0,py0,pw,ph,xmax,ymax);
+  }
+
+  ctx.restore(); // 解除裁切
+
+  // ---- 圖例（畫在圖內右上角，白底黑框）----
+  if(legendOn) drawLegend(px0, py0-ph, pw, betaDeg, fr, phiDec);
+}
+
+// 角度弧：在資料座標的頂點畫弧，因 x/y 比例不同，用像素半徑近似
+function drawAngleArc(X,Y,vx,vy, angleDeg, ratio, color, text, px0,py0,pw,ph,xmax,ymax){
+  const cx=X(vx), cy=Y(vy);
+  const Rpx=Math.min(pw,ph)*0.16;
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash([]);
+  // 螢幕上 y 向上為負；資料角度 a → 螢幕方向須考慮 x/y 縮放
+  const sx = pw/xmax, sy = ph/ymax;
+  ctx.beginPath();
+  const steps=40;
+  for(let k=0;k<=steps;k++){
+    const a=(angleDeg*k/steps)*Math.PI/180;
+    // 資料方向 (cos a, sin a) → 螢幕方向
+    let dx=Math.cos(a)*sx, dy=-Math.sin(a)*sy;
+    const L=Math.hypot(dx,dy); dx=dx/L*Rpx; dy=dy/L*Rpx;
+    const x=cx+dx, y=cy+dy;
+    if(k===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  // 標籤
+  const am=(angleDeg/2)*Math.PI/180;
+  let dx=Math.cos(am)*sx, dy=-Math.sin(am)*sy;
+  const L=Math.hypot(dx,dy); dx=dx/L*(Rpx+30); dy=dy/L*(Rpx+14);
+  ctx.fillStyle=color; ctx.font=font("600 14px");
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(text, cx+dx, cy+dy);
+}
+
+// 圖例：畫在繪圖區右上角內側，白底黑框
+function drawLegend(px0, plotTop, pw, betaDeg, fr, phiDec){
+  const items=[];
+  circles.forEach((c,i)=>{
+    const g=circleGeom(c); if(!g) return;
+    items.push({type:"line", color:c.color, dash:LINE_STYLES[c.style].dash,
+                width:parseFloat(c.width)||2, text:(c.label&&c.label.trim())?c.label:autoLabel(c)});
+  });
+  if($("showEnv").checked && fr)
+    items.push({type:"line", color:$("envColor").value,
+      dash:LINE_STYLES[parseInt($("envStyle").value)].dash, width:2,
+      text:`τ = 0 + σ tan(${fr.phi.toFixed(phiDec)}°)`});
+  if($("showJoint").checked)
+    items.push({type:"tri", color:$("jointColor").value, text:`節理 ${betaDeg}° 點`});
+  if($("showCenter").checked)
+    items.push({type:"line", color:$("centerColor").value,
+      dash:LINE_STYLES[parseInt($("centerStyle").value)].dash, width:2, text:"圓心連線"});
+  if(items.length===0) return;
+
+  const fsize   = Math.max(6, parseFloat($("legendSize").value)||13);
+  const pad     = Math.max(0, isNaN(parseFloat($("legendPad").value))?9:parseFloat($("legendPad").value));
+  const sampleW = Math.max(6, parseFloat($("legendSample").value)||34);
+  ctx.font=font(fsize+"px"); ctx.textBaseline="middle";
+  const gap=Math.round(fsize*0.55)+3, padX=pad, padY=pad, rowH=fsize+9;
+  let maxTW=0;
+  items.forEach(it=>{ maxTW=Math.max(maxTW, ctx.measureText(it.text).width); });
+  const boxW = padX*2 + sampleW + gap + maxTW;
+  const boxH = padY*2 + items.length*rowH;
+  const bx = px0 + pw - boxW - 12;   // 右上內側
+  const by = plotTop + 12;
+
+  // 白底黑框
+  ctx.setLineDash([]); ctx.fillStyle="#fff"; ctx.strokeStyle="#000"; ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.rect(bx, by, boxW, boxH); ctx.fill(); ctx.stroke();
+
+  // 項目
+  ctx.textAlign="left";
+  const lx = bx + padX;
+  items.forEach((it,i)=>{
+    const yy = by + padY + rowH*i + rowH/2;
+    if(it.type==="line"){
+      ctx.strokeStyle=it.color; ctx.lineWidth=it.width; ctx.setLineDash(it.dash);
+      ctx.beginPath(); ctx.moveTo(lx,yy); ctx.lineTo(lx+sampleW,yy); ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.fillStyle=it.color;
+      const mx=lx+sampleW/2;
+      ctx.beginPath(); ctx.moveTo(mx,yy-6); ctx.lineTo(mx-7,yy+5); ctx.lineTo(mx+7,yy+5);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle="#000"; ctx.fillText(it.text, lx+sampleW+gap, yy);
+  });
+}
+
+function niceStep(max){
+  const raw=max/8;
+  const exp=Math.floor(Math.log10(raw));
+  const base=Math.pow(10,exp);
+  const f=raw/base;
+  let nf; if(f<=1)nf=1; else if(f<=2)nf=2; else if(f<=2.5)nf=2.5; else if(f<=5)nf=5; else nf=10;
+  return nf*base;
+}
+function fmt(v){ return (Math.round(v*100)/100).toString(); }
+
+// ============ 事件綁定 ============
+$("addRow").addEventListener("click", ()=>addCircle());
+["title","xtitle","ytitle","xmax","ymax","hmax","ratio","grid","legend",
+ "legendSize","legendPad","legendSample","beta","phiDec",
+ "showJoint","jointColor","showCenter","centerTarget","centerStyle","centerColor","showBetaArc",
+ "showEnv","envColor","envStyle","showPhiArc"].forEach(id=>{
+  const el=$(id);
+  el.addEventListener(el.type==="color"?"input":"change", redraw);
+  if(el.type==="text"||el.type==="number") el.addEventListener("input", redraw);
+});
+
+// 上下標按鈕：對目標標題框的選取範圍包上 _{..} 或 ^{..}
+document.querySelectorAll(".subsup").forEach(btn=>{
+  // mousedown 時阻止預設，保住 input 內的選取
+  btn.addEventListener("mousedown", e=>e.preventDefault());
+  btn.addEventListener("click", ()=>{
+    const inp=$(btn.dataset.target);
+    let s=inp.selectionStart, e=inp.selectionEnd;
+    if(s==null || s===e){ inp.focus(); alert("請先在標題框內選取要設為上/下標的文字"); return; }
+    const sel=inp.value.slice(s,e);
+    const tok=(btn.dataset.kind==="sub"?"_{":"^{")+sel+"}";
+    inp.value=inp.value.slice(0,s)+tok+inp.value.slice(e);
+    inp.focus(); inp.setSelectionRange(s, s+tok.length);
+    redraw();
+  });
+});
+
+$("segMode").querySelectorAll("button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    $("segMode").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    inputMode=b.dataset.mode;
+    $("col2head").textContent = inputMode==="dev" ? "軸差 σ₁−σ₃" : "軸向 σ₁";
+    redraw();
+  });
+});
+
+$("exportBtn").addEventListener("click", ()=>{
+  const a=document.createElement("a");
+  a.download=($("title").value||"mohr")+".png";
+  a.href=cv.toDataURL("image/png");
+  a.click();
+});
+
+// 範例資料（取自你的 Excel）
+$("loadDemo7").addEventListener("click", ()=>{
+  circles=[]; nextColorIdx=0;
+  const d=[[3.71,11.22],[6.44,16.86],[9.32,22.77],[12.43,29.92],[15.34,46.95],[18.52,56.89],[21.12,62.24]];
+  d.forEach((r,i)=>circles.push({s3:r[0],val:r[1],label:"",style:0,color:DEFAULT_COLORS[i%10],width:2}));
+  nextColorIdx=d.length;
+  setMode("dev"); $("beta").value=60; renderRows(); redraw();
+});
+$("loadDemo2").addEventListener("click", ()=>{
+  circles=[]; nextColorIdx=0;
+  const d=[[5.192,18.96],[9.114,29.485]];
+  d.forEach((r,i)=>circles.push({s3:r[0],val:r[1],label:"",style:0,color:DEFAULT_COLORS[i%10],width:2}));
+  nextColorIdx=d.length;
+  setMode("dev"); $("beta").value=73; renderRows(); redraw();
+});
+function setMode(m){
+  inputMode=m;
+  $("segMode").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.mode===m));
+  $("col2head").textContent = m==="dev" ? "軸差 σ₁−σ₃" : "軸向 σ₁";
+}
+
+// ============ 初始化 ============
+styleOptions($("envStyle")); $("envStyle").value="1"; // 破壞包絡線預設虛線
+styleOptions($("centerStyle")); $("centerStyle").value="3"; // 圓心連線預設中心線(點劃線)
+addCircle(5,18,0);
+addCircle(9,28,0);
+</script>
+</body>
+</html>
